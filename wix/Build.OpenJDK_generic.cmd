@@ -1,13 +1,13 @@
 @ECHO OFF
 
 REM Set version numbers and build option here if being run manually:
-REM PRODUCT_MAJOR_VERSION=11
-REM PRODUCT_MINOR_VERSION=0
-REM PRODUCT_MAINTENANCE_VERSION=0
-REM PRODUCT_PATCH_VERSION=28
-REM ARCH=x64|x86 or both "x64,x86"
-REM JVM=hotspot|openj9 or both JVM=hotspot openj9
-REM PRODUCT_CATEGORY=jre|jdk (only one at a time)
+SET PRODUCT_MAJOR_VERSION=8
+SET PRODUCT_MINOR_VERSION=1
+SET PRODUCT_MAINTENANCE_VERSION=202
+SET PRODUCT_PATCH_VERSION=08
+SET ARCH=x64
+SET JVM=openj9
+SET PRODUCT_CATEGORY=jdk
 
 SETLOCAL ENABLEEXTENSIONS
 SET ERR=0
@@ -63,6 +63,7 @@ REM
 REM Cultures: https://msdn.microsoft.com/de-de/library/ee825488(v=cs.20).aspx
 SET PRODUCT_SKU=OpenJDK
 SET PRODUCT_VERSION=%PRODUCT_MAJOR_VERSION%.%PRODUCT_MINOR_VERSION%.%PRODUCT_MAINTENANCE_VERSION%.%PRODUCT_PATCH_VERSION%
+SET ICEDTEAWEB_DIR=.\SourceDir\icedtea-web-image
 
 
 REM Generate platform specific builds (x86,x64)
@@ -119,7 +120,14 @@ FOR %%G IN (%ARCH%) DO (
 	    GOTO FAILED
 	)
 
-    REM Build without extra Source Code feature
+	ECHO HEAT
+    "!WIX!bin\heat.exe" dir "!ICEDTEAWEB_DIR!" -out Files-IcedTeaWeb.wxs -t "!SETUP_RESOURCES_DIR!\heat.icedteaweb.xslt" -gg -sfrag -scom -sreg -srd -ke -cg "IcedTeaWebFiles" -var var.IcedTeaWebDir -dr INSTALLDIR -platform !PLATFORM!
+    IF ERRORLEVEL 1 (
+        ECHO "Failed to generating Windows Installer XML Source files for IcedTea-Web (.wxs)"
+        GOTO FAILED
+    )
+
+    REM Build AdoptOpenJDK without extra Source Code feature
 	ECHO HEAT
     "!WIX!bin\heat.exe" dir "!REPRO_DIR!" -out Files-!OUTPUT_BASE_FILENAME!.wxs -gg -sfrag -scom -sreg -srd -ke -cg "AppFiles" -var var.ProductMajorVersion -var var.ProductMinorVersion -var var.ProductMaintenanceVersion -var var.ProductPatchVersion -var var.ReproDir -dr INSTALLDIR -platform !PLATFORM!
 	IF ERRORLEVEL 1 (
@@ -127,13 +135,13 @@ FOR %%G IN (%ARCH%) DO (
 	    GOTO FAILED
 	)
 	ECHO CANDLE
-    "!WIX!bin\candle.exe" -arch !PLATFORM! Main-!OUTPUT_BASE_FILENAME!.wxs Files-!OUTPUT_BASE_FILENAME!.wxs -ext WixUIExtension -ext WixUtilExtension -dProductSku="!PRODUCT_SKU!" -dProductMajorVersion="!PRODUCT_MAJOR_VERSION!" -dProductMinorVersion="!PRODUCT_MINOR_VERSION!" -dProductMaintenanceVersion="!PRODUCT_MAINTENANCE_VERSION!" -dProductPatchVersion="!PRODUCT_PATCH_VERSION!" -dProductId="!PRODUCT_ID!" -dProductUpgradeCode="!PRODUCT_UPGRADE_CODE!" -dReproDir="!REPRO_DIR!" -dSetupResourcesDir="!SETUP_RESOURCES_DIR!" -dCulture="!CULTURE!"
+    "!WIX!bin\candle.exe" -arch !PLATFORM! Main-!OUTPUT_BASE_FILENAME!.wxs Files-!OUTPUT_BASE_FILENAME!.wxs Files-IcedTeaWeb.wxs -ext WixUIExtension -ext WixUtilExtension -dIcedTeaWebDir="!ICEDTEAWEB_DIR!" -dProductSku="!PRODUCT_SKU!" -dProductMajorVersion="!PRODUCT_MAJOR_VERSION!" -dProductMinorVersion="!PRODUCT_MINOR_VERSION!" -dProductMaintenanceVersion="!PRODUCT_MAINTENANCE_VERSION!" -dProductPatchVersion="!PRODUCT_PATCH_VERSION!" -dProductId="!PRODUCT_ID!" -dProductUpgradeCode="!PRODUCT_UPGRADE_CODE!" -dReproDir="!REPRO_DIR!" -dSetupResourcesDir="!SETUP_RESOURCES_DIR!" -dCulture="!CULTURE!"
 	IF ERRORLEVEL 1 (
 	    ECHO "Failed to preprocesses and compiles WiX source files into object files (.wixobj)"
 	    GOTO FAILED
 	)
 	ECHO "LIGHT"
-    "!WIX!bin\light.exe" Main-!OUTPUT_BASE_FILENAME!.wixobj Files-!OUTPUT_BASE_FILENAME!.wixobj -cc !CACHE_FOLDER! -sval -ext WixUIExtension -ext WixUtilExtension -spdb -out "ReleaseDir\!OUTPUT_BASE_FILENAME!.msi" -loc "Lang\!PRODUCT_SKU!.Base.!CULTURE!.wxl" -loc "Lang\!PRODUCT_SKU!.!PACKAGE_TYPE!.!CULTURE!.wxl" -cultures:!CULTURE!
+    "!WIX!bin\light.exe" Main-!OUTPUT_BASE_FILENAME!.wixobj Files-!OUTPUT_BASE_FILENAME!.wixobj Files-IcedTeaWeb.wixobj -cc !CACHE_FOLDER! -sval -ext WixUIExtension -ext WixUtilExtension -spdb -out "ReleaseDir\!OUTPUT_BASE_FILENAME!.msi" -loc "Lang\!PRODUCT_SKU!.Base.!CULTURE!.wxl" -loc "Lang\!PRODUCT_SKU!.!PACKAGE_TYPE!.!CULTURE!.wxl" -cultures:!CULTURE!
 	IF ERRORLEVEL 1 (
 	    ECHO "Failed to links and binds one or more .wixobj files and creates a Windows Installer database (.msi or .msm)"
 	    GOTO FAILED
@@ -209,6 +217,8 @@ FOR %%G IN (%ARCH%) DO (
     DEL "Files-!OUTPUT_BASE_FILENAME!.wixobj"
     DEL "Main-!OUTPUT_BASE_FILENAME!.wxs"
     DEL "Main-!OUTPUT_BASE_FILENAME!.wixobj"
+    DEL "Files-IcedTeaWeb.wxs"
+    DEL "FilesIcedTeaWeb.wixobj"
     RMDIR /S /Q !CACHE_FOLDER!
   )
 )
@@ -229,6 +239,7 @@ SET PRODUCT_ID=
 SET PRODUCT_VERSION=
 SET PLATFORM=
 SET REPRO_DIR=
+SET ICEDTEAWEB_DIR=
 SET SETUP_RESOURCES_DIR=
 SET WIN_SDK_FULL_VERSION=
 SET WIN_SDK_MAJOR_VERSION=
